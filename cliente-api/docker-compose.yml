@@ -1,0 +1,15 @@
+version: '3.8'
+services:
+  mongodb_cliente:
+    image: mongo
+    container_name: mongodb-cliente
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: pass
+    ports:
+      - "27020:27017"
+    volumes:
+      - mongodb-data:/data/db
+
+volumes:
+  mongodb-data:
