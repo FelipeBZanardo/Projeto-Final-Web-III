@@ -4,7 +4,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.InitializingBean;
 import org.springframework.stereotype.Component;
-import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.Sinks;
 import reactor.core.scheduler.Schedulers;
@@ -18,6 +17,7 @@ import tech.ada.pedidoapi.repository.PedidoRepository;
 import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.Instant;
+
 
 
 @Slf4j
@@ -40,40 +40,32 @@ public class PubSubListener implements InitializingBean {
                             pedidoRepository.findById(next.pedido().getId())
                                     .subscribeOn(Schedulers.boundedElastic())
                                     .flatMap(pedido -> {
-                                        log.info("Verificando Status do Pedido - {}", pedido);
-                                        if(pedido.getStatus().equals(Status.REALIZADO)){
-                                            log.info("Pedido confirmado. Está pronto para ser enviado - {}",pedido );
+                                        if(verificarStatusPedido(pedido, Status.REALIZADO,
+                                                "Pedido confirmado. Está pronto para ser enviado"))
                                             return pedidoRepository.save(
                                                     pedido.withStatus(Status.CONFIRMADO).withData(Instant.now()));
-                                        }
-                                        log.error("Pedido não confirmado. Erro ao efetuar compra");
                                         return Mono.defer(() -> pedidoRepository.save(pedido));
                                     })
                                     .flatMap(pedido -> {
-                                        log.info("Verificando Status do Pedido - {}", pedido);
-                                        if(pedido.getStatus().equals(Status.CONFIRMADO)){
-                                            log.info("Enviando pedido - {}", pedido);
+                                        if(verificarStatusPedido(pedido, Status.CONFIRMADO,
+                                                "Enviando pedido"))
                                             return pedidoRepository.save(
                                                     pedido.withStatus(Status.ENVIADO).withData(Instant.now()));
-                                        }
-                                        log.error("Pedido não enviado. Erro ao efetuar compra");
                                         return Mono.defer(() -> pedidoRepository.save(pedido));
                                     })
                                     .flatMap(pedido -> {
-                                        if(pedido.getStatus().equals(Status.ENVIADO)){
-                                            log.info("Atualizando Estoque na Api de Catálogo - {}", pedido);
+                                        if(verificarStatusPedido(pedido, Status.ENVIADO,
+                                                "Atualizando Estoque na Api de Catálogo"))
                                             pedido.getItens().forEach(item ->
                                                     catalogoClient.atualizarQuantidade(item.idProduto(), item.quantidade())
                                                             .subscribe());
-                                        }
                                         return Mono.defer(() -> pedidoRepository.findById(pedido.getId()));
                                     })
                                     .flatMap(pedido -> {
-                                        if(pedido.getStatus().equals(Status.ENVIADO)){
-                                            log.info("Enviando e-mail com detalhes da compra - {}", pedido);
+                                        if(verificarStatusPedido(pedido, Status.ENVIADO,
+                                                "Enviando e-mail com detalhes da compra"))
                                             return enviarEmail(pedido).
                                                     flatMap(__ -> pedidoRepository.findById(pedido.getId()));
-                                        }
                                         return Mono.defer(() -> pedidoRepository.findById(pedido.getId()));
                                     })
                                     .doOnError(throwable -> {
@@ -87,31 +79,37 @@ public class PubSubListener implements InitializingBean {
                 );
     }
 
+    private boolean verificarStatusPedido(Pedido pedido, Status status, String mensagemLog){
+        log.info("Verificando Status do Pedido - {}", pedido);
+        if(pedido.getStatus().equals(status)) {
+            log.info("{} - {}", mensagemLog, pedido);
+            return true;
+        }
+        log.error("Erro!");
+        return false;
+    }
+
     private Mono<Email> enviarEmail(Pedido pedido) {
         String destinatario = pedido.getCliente().email();
         String assunto = "Seu pedido foi ENVIADO!";
         StringBuilder mensagem = new StringBuilder("""
-                Parabéns seu pedido foi ENVIADO e logo chegará até você.
-                
+                Parabéns %s, seu pedido foi ENVIADO e logo chegará até você.
+                                
                 Detalhes da compra:
-                
+                                
                 %-30s  %-20s  %-20s  %-20s
-                """.formatted("Produto", "Quantidade", "Preço unitário(R$)", "Total(R$)"));
+                """.formatted(pedido.getCliente().nome(), "Produto", "Quantidade", "Preço unitário(R$)", "Total(R$)"));
 
-        return Flux.fromIterable(pedido.getItens()).
-                subscribeOn(Schedulers.boundedElastic())
-                .flatMap(itemRequest ->
-                                catalogoClient.getProdutoById(itemRequest.idProduto())
-                                        .map(produto -> new StringBuilder("%-30s  %-20s  %-20s  %-20s%n".formatted(
-                                                produto.nome(), itemRequest.quantidade(),
-                                                produto.preco(),
-                                                produto.preco().multiply(BigDecimal.valueOf(itemRequest.quantidade())))
-                                        )))
+        StringBuilder msg = pedido.getItens().stream()
+                .map(item -> new StringBuilder("%-30s  %-20s  %-20s  %-20s%n".formatted(
+                        item.nomeProduto(), item.quantidade(),
+                        item.valorUnitario(),
+                        item.valorUnitario().multiply(BigDecimal.valueOf(item.quantidade())))))
                 .reduce(StringBuilder::append)
-                .flatMap(msg -> {
-                    mensagem.append(msg.toString()).append("\n\nTotal do Pedido: R$").append(pedido.getTotal());
-                    return emailClient.enviarEmail(new Email(destinatario, assunto, mensagem.toString()));
-                });
+                .get();
+
+        mensagem.append(msg.append("\n\nTotal do Pedido: R$").append(pedido.getTotal()));
+        return emailClient.enviarEmail(new Email(destinatario, assunto, mensagem.toString()));
 
     }
 }

@@ -5,11 +5,8 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 
 public record ItemRequest(
-        @NotNull(message = "O campo 'idProduto' não pode ser nulo.")
-        @NotBlank(message = "O campo 'idProduto' não pode ser vazio.")
+        @NotBlank(message = "O campo 'idProduto' não pode ser vazio ou nulo.")
         String idProduto,
         @NotNull(message = "O campo 'quantidade' não pode ser nulo.")
         @Positive(message = "O campo 'quantidade' deve ser um número positivo")
-        Integer quantidade) {
-
-}
+        Integer quantidade) { }

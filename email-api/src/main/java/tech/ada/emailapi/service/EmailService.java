@@ -29,7 +29,7 @@ public class EmailService {
             mensagem.setText(emailRequest.mensagem());
             mensagem.setSubject(emailRequest.assunto());
 
-                javaMailSender.send(mensagem);
+            javaMailSender.send(mensagem);
 
             log.info("Enviando e-mail - {}",emailRequest);
             return emailRepository.save(new Email(UUID.randomUUID().toString(),

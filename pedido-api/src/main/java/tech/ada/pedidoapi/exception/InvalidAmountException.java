@@ -12,6 +12,7 @@ public class InvalidAmountException extends RuntimeException{
 
     @Override
     public String getMessage() {
-        return "Quantidade do produto '" + produto.nome() + "' insuficiente. Há apenas " + produto.quantidade() + " no estoque";
+        return "Quantidade do produto '%s - %s' insuficiente. Há apenas %s no estoque."
+                .formatted(produto.nome(), produto.id(), produto.quantidade());
     }
 }

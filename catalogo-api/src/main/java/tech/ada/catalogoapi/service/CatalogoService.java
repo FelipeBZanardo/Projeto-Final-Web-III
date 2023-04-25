@@ -8,7 +8,7 @@ import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 import tech.ada.catalogoapi.exception.ProductNotFoundException;
 import tech.ada.catalogoapi.model.Produto;
-import tech.ada.catalogoapi.model.ProdutoRequest;
+import tech.ada.catalogoapi.model.dto.ProdutoRequest;
 import tech.ada.catalogoapi.repository.CatalogoRepository;
 
 import java.util.UUID;

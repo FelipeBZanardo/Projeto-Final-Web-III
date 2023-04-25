@@ -5,7 +5,6 @@ import lombok.Data;
 import lombok.With;
 import org.springframework.data.mongodb.core.mapping.Document;
 import tech.ada.pedidoapi.client.dto.Cliente;
-import tech.ada.pedidoapi.model.dto.ItemRequest;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -18,7 +17,7 @@ import java.util.List;
 public class Pedido {
     private String id;
     private Cliente cliente;
-    private List<ItemRequest> itens;
+    private List<Item> itens;
     private Instant data;
     private Status status;
     private BigDecimal total;

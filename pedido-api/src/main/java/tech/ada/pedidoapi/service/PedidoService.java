@@ -9,8 +9,10 @@ import reactor.core.scheduler.Schedulers;
 import tech.ada.pedidoapi.client.CatalogoClient;
 import tech.ada.pedidoapi.client.ClienteClient;
 import tech.ada.pedidoapi.client.dto.Cliente;
+import tech.ada.pedidoapi.client.dto.Produto;
 import tech.ada.pedidoapi.exception.InvalidAmountException;
 import tech.ada.pedidoapi.exception.OrderNotFoundException;
+import tech.ada.pedidoapi.model.Item;
 import tech.ada.pedidoapi.model.dto.ItemRequest;
 import tech.ada.pedidoapi.model.Pedido;
 import tech.ada.pedidoapi.model.Status;
@@ -33,28 +35,41 @@ public class PedidoService {
     public Mono<Pedido> efetuarPedido(PedidoRequest pedidoRequest) {
         log.info("Iniciando Pedido - {}", pedidoRequest);
         return Mono.defer(() -> verificarCliente(pedidoRequest.idCliente()))
-                        .flatMap(cliente -> {
-                            log.info("Verificando estoque e calculando total do pedido");
+                .flatMap(cliente -> {
+                    log.info("Verificando estoque e calculando total do pedido");
 
-                            Pedido pedido = Pedido.builder()
-                                    .id(UUID.randomUUID().toString())
-                                    .cliente(cliente)
-                                    .itens(pedidoRequest.itens())
-                                    .status(Status.REALIZADO)
-                                    .total(BigDecimal.ZERO)
-                                    .data(Instant.now())
-                                    .build();
+                    Pedido pedido = Pedido.builder()
+                            .id(UUID.randomUUID().toString())
+                            .cliente(cliente)
+                            .status(Status.REALIZADO)
+                            .total(BigDecimal.ZERO)
+                            .data(Instant.now())
+                            .build();
 
-                            return calcularTotal(pedidoRequest.itens())
-                                    .map(bigDecimal -> {
-                                        pedido.setTotal(bigDecimal);
-                                        return pedido;
-                                    })
-                                    .flatMap(__ -> {
-                                        log.info("Salvando pedido no banco de dados - {}", pedido);
-                                        return pedidoRepository.save(pedido);
-                                    });
-                        });
+                    List<Item> itens = new ArrayList<>();
+
+                    return obterProdutos(pedidoRequest.itens())
+                            .map(produto -> {
+                                Integer qtd = pedidoRequest
+                                        .itens()
+                                        .stream()
+                                        .filter(itemRequest -> itemRequest.idProduto().equals(produto.id()))
+                                        .findFirst()
+                                        .get()
+                                        .quantidade();
+
+                                itens.add(new Item(produto.id(), produto.nome(),
+                                        qtd, produto.preco()));
+
+                                BigDecimal quantidade = BigDecimal.valueOf(qtd);
+                                return produto.preco().multiply(quantidade);
+                            }).reduce(BigDecimal::add)
+                            .map(bigDecimal -> {
+                                pedido.setTotal(bigDecimal);
+                                pedido.setItens(itens);
+                                return pedido;
+                            }).flatMap(__ -> pedidoRepository.save(pedido));
+                });
     }
 
     private Mono<Cliente> verificarCliente(String idCliente) {
@@ -64,21 +79,17 @@ public class PedidoService {
         }).subscribeOn(Schedulers.boundedElastic());
     }
 
-    private Mono<BigDecimal> calcularTotal(List<ItemRequest> itens){
-       return Flux.fromIterable(itens).
-               subscribeOn(Schedulers.boundedElastic())
-               .flatMap(itemRequest ->
-                       catalogoClient.getProdutoById(itemRequest.idProduto())
-                               .map(produto -> {
-                                   if (produto.quantidade() < itemRequest.quantidade())
-                                       throw new InvalidAmountException(produto);
-                                   return produto;
-                               })
-                               .map(produto -> {
-                                   BigDecimal quantidade = BigDecimal.valueOf(itemRequest.quantidade());
-                                   return produto.preco().multiply(quantidade);}))
-               .reduce(BigDecimal::add);
-   }
+    private Flux<Produto> obterProdutos(List<ItemRequest> itens){
+        return Flux.fromIterable(itens).
+                subscribeOn(Schedulers.boundedElastic())
+                .flatMap(itemRequest ->
+                        catalogoClient.getProdutoById(itemRequest.idProduto())
+                                .map(produto -> {
+                                    if (produto.quantidade() < itemRequest.quantidade())
+                                        throw new InvalidAmountException(produto);
+                                    return produto;
+                                }));
+    }
 
     public Flux<Pedido> getAll() {
         return Flux.defer(() ->{

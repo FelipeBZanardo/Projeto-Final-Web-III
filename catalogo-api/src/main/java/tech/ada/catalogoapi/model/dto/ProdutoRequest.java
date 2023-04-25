@@ -1,12 +1,11 @@
-package tech.ada.catalogoapi.model;
+package tech.ada.catalogoapi.model.dto;
 
 import jakarta.validation.constraints.*;
 
 import java.math.BigDecimal;
 
 public record ProdutoRequest(
-        @NotNull(message = "O campo 'nome' não pode ser nulo.")
-        @NotBlank(message = "O campo 'nome' não pode ser vazio.")
+        @NotBlank(message = "O campo 'nome' não pode ser vazio ou nulo.")
         String nome,
         @NotNull(message = "O campo 'preco' não pode ser nulo.")
         @DecimalMin(value = "0.0", message = "O campo 'preco' não pode ser negativo.")
