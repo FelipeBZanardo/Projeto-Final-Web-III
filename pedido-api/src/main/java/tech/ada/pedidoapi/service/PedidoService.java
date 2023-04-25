@@ -75,7 +75,8 @@ public class PedidoService {
     private Mono<Cliente> verificarCliente(String idCliente) {
         return Mono.defer(() -> {
             log.info("Verificando Cliente - {}", idCliente);
-            return clienteClient.getClienteById(idCliente);
+            //return clienteClient.getClienteById(idCliente);
+            return clienteClient.getclienteByIdCircuitBreaker(idCliente);
         }).subscribeOn(Schedulers.boundedElastic());
     }
 
@@ -83,7 +84,8 @@ public class PedidoService {
         return Flux.fromIterable(itens).
                 subscribeOn(Schedulers.boundedElastic())
                 .flatMap(itemRequest ->
-                        catalogoClient.getProdutoById(itemRequest.idProduto())
+                        //catalogoClient.getProdutoById(itemRequest.idProduto())
+                        catalogoClient.getProdutoByIdCircuitBreaker(itemRequest.idProduto())
                                 .map(produto -> {
                                     if (produto.quantidade() < itemRequest.quantidade())
                                         throw new InvalidAmountException(produto);

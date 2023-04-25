@@ -3,10 +3,11 @@ package tech.ada.pedidoapi.client;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cloud.client.circuitbreaker.ReactiveCircuitBreaker;
+import org.springframework.cloud.client.circuitbreaker.ReactiveCircuitBreakerFactory;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
-import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import tech.ada.pedidoapi.client.dto.Produto;
 import tech.ada.pedidoapi.exception.ProductNotFoundException;
@@ -17,28 +18,18 @@ public class CatalogoClient {
 
     private final WebClient client;
     private final ObjectMapper mapper;
+    private final ReactiveCircuitBreaker reactiveCircuitBreaker;
 
-    public CatalogoClient(WebClient.Builder clientBuilder, ObjectMapper mapper) {
+    public CatalogoClient(WebClient.Builder clientBuilder, ObjectMapper mapper,
+                          ReactiveCircuitBreakerFactory<?, ?> reactiveCircuitBreakerFactory) {
         this.client = clientBuilder
                 .baseUrl("http://localhost:8080")
                 .build();
         this.mapper = mapper;
+        this.reactiveCircuitBreaker = reactiveCircuitBreakerFactory.create("catalogo-api-circuit-breaker");
     }
 
-    public Flux<Produto> getAllProdutos(){
-        return this.client
-                .get()
-                .uri("/catalogo")
-                .exchangeToFlux(result -> {
-                    if (result.statusCode().is2xxSuccessful())
-                        return result.bodyToFlux(Produto.class);
-                    else
-                        return Flux.error(new RuntimeException("Erro na busca do catálogo"));
-
-                });
-    }
-
-    public Mono<Produto> getProdutoById(String id){
+    private Mono<Produto> executarBuscaPorId(String id){
         return this.client
                 .get()
                 .uri("/catalogo/" + id)
@@ -54,7 +45,21 @@ public class CatalogoClient {
                 });
     }
 
-    public Mono<Produto> atualizarQuantidade(String id, Integer quantidade){
+    public Mono<Produto> getProdutoById(String id){
+        return executarBuscaPorId(id);
+    }
+
+    public Mono<Produto> getProdutoByIdCircuitBreaker(String id){
+        return this.reactiveCircuitBreaker
+                .run(executarBuscaPorId(id), this::fallbackMethod);
+    }
+
+    private <T> Mono<T> fallbackMethod(Throwable throwable) {
+        log.error("Entrando no método de fallback", throwable);
+        return Mono.empty();
+    }
+
+    private Mono<Produto> exexutarAtualizarQuantidade(String id, Integer quantidade){
         String payload = "";
         try{
             payload = mapper.writeValueAsString(quantidade);
@@ -76,5 +81,14 @@ public class CatalogoClient {
                         return new ProductNotFoundException(id);
                     });
                 });
+    }
+
+    public Mono<Produto> atualizarQuantidade(String id, Integer quantidade){
+        return exexutarAtualizarQuantidade(id, quantidade);
+    }
+
+    public Mono<Produto> atualizarQuantidadeCircuitBreaker(String id, Integer quantidade){
+        return this.reactiveCircuitBreaker
+                .run(exexutarAtualizarQuantidade(id, quantidade), this::fallbackMethod);
     }
 }

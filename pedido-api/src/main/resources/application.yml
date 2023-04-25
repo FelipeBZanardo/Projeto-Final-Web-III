@@ -19,3 +19,38 @@ eureka:
     fetch-registry: true
     service-url:
       defaultZone: http://localhost:8761/eureka/
+
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      catalogo-api-circuit-breaker:
+        slidingWindowSize: 10
+        failureRateThreshold: 50
+        waitDurationInOpenState: 5000
+        slowCallDurationThreshold: 500
+        slowCallRateThreshold: 50
+        permittedNumberOfCallsInHalfOpenState: 3
+      cliente-api-circuit-breaker:
+        slidingWindowSize: 10
+        failureRateThreshold: 50
+        waitDurationInOpenState: 5000
+        slowCallDurationThreshold: 500
+        slowCallRateThreshold: 50
+        permittedNumberOfCallsInHalfOpenState: 3
+      email-api-circuit-breaker:
+        slidingWindowSize: 10
+        failureRateThreshold: 50
+        waitDurationInOpenState: 5000
+        slowCallDurationThreshold: 500
+        slowCallRateThreshold: 50
+        permittedNumberOfCallsInHalfOpenState: 3
+
+resilience4j.timelimiter:
+  configs:
+    email:
+      cancelRunningFuture: false
+      timeoutDuration: 5s
+  instances:
+    email-api-circuit-breaker:
+      baseConfig: email
