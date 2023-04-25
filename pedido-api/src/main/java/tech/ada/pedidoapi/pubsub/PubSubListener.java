@@ -57,7 +57,8 @@ public class PubSubListener implements InitializingBean {
                                         if(verificarStatusPedido(pedido, Status.ENVIADO,
                                                 "Atualizando Estoque na Api de Catálogo"))
                                             pedido.getItens().forEach(item ->
-                                                    catalogoClient.atualizarQuantidade(item.idProduto(), item.quantidade())
+                                                    //catalogoClient.atualizarQuantidade(item.idProduto(), item.quantidade())
+                                                    catalogoClient.atualizarQuantidadeCircuitBreaker(item.idProduto(), item.quantidade())
                                                             .subscribe());
                                         return Mono.defer(() -> pedidoRepository.findById(pedido.getId()));
                                     })
@@ -109,7 +110,7 @@ public class PubSubListener implements InitializingBean {
                 .get();
 
         mensagem.append(msg.append("\n\nTotal do Pedido: R$").append(pedido.getTotal()));
-        return emailClient.enviarEmail(new Email(destinatario, assunto, mensagem.toString()));
-
+        //return emailClient.enviarEmail(new Email(destinatario, assunto, mensagem.toString()));
+        return emailClient.enviarEmailCircuitBreaker(new Email(destinatario, assunto, mensagem.toString()));
     }
 }
