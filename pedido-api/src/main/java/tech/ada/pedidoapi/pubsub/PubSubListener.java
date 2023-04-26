@@ -110,7 +110,7 @@ public class PubSubListener implements InitializingBean {
                 .get();
 
         mensagem.append(msg.append("\n\nTotal do Pedido: R$").append(pedido.getTotal()));
-        //return emailClient.enviarEmail(new Email(destinatario, assunto, mensagem.toString()));
-        return emailClient.enviarEmailCircuitBreaker(new Email(destinatario, assunto, mensagem.toString()));
+        return emailClient.enviarEmail(new Email(destinatario, assunto, mensagem.toString()));
+        //return emailClient.enviarEmailCircuitBreaker(new Email(destinatario, assunto, mensagem.toString()));
     }
 }
