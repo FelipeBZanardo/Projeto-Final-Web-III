@@ -36,6 +36,9 @@ Implementar uma API REST de um e-commerce utilizando uma arquitetura de microsse
     - O estoque é atualizado através da api de catálogo;
     - Uma mensagem será enviada por e-mail (através da api de e-mail) após o pedido ser ENVIADO;
     - Caso aconteça um erro durante o procedimento o Status do Pedido mudará para ERRO_NO_PEDIDO.
+    - Como padrão o projeto está sem o Circuit Breaker, para testá-lo basta descomentar as seguintes linhas e comentar as anteriores:
+        - Na Classe PedidoService: linhas 79 e 88;
+        - Na Classe PubSubListener: linha 114.
 
 ## ⚙️ Configurações Iniciais
 
